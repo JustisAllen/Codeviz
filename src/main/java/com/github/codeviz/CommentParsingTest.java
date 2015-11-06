@@ -22,7 +22,7 @@ public class CommentParsingTest {
 
         // Print the comments within the file
         for (Comment comment : cu.getComments()) {
-        	System.out.print(comment);
+        	System.out.println(comment.getContent());
         }
     }
 }
