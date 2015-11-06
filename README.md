@@ -28,3 +28,5 @@ in generated flowcharts if the user provides a description for the construct;
 whereas, Flowgen includes _every_ `if` statement in its flowcharts,
 causing C++'s syntax to leak into the diagram
 when users do not provide a more human-readable description for the condition.
+
+[Flowgen]: http://jlopezvi.github.io/Flowgen/index.html
