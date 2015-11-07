@@ -23,12 +23,6 @@
   </dependencies>
 
   <build>
-    <resources>
-      <resource>
-        <directory>src/main/java</directory>
-      </resource>
-    </resources>
-
     <plugins>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -42,7 +36,7 @@
           </execution>
         </executions>
         <configuration>
-          <mainClass>com.github.codeviz.CommentParsingTest</mainClass>
+          <mainClass>com.github.codeviz.Codeviz</mainClass>
         </configuration>
       </plugin>
     </plugins>

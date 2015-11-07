@@ -4,13 +4,16 @@ import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.comments.Comment;
 
-import java.io.InputStream;
+import java.io.FileInputStream;
 
-public class CommentParsingTest {
+public class Codeviz {
     public static void main(String[] args) throws Exception {
 
         // Create an input stream for the file to be parsed
-        InputStream in = CommentParsingTest.class.getResourceAsStream("CommentParsingTest.java");
+        FileInputStream in = new FileInputStream(
+        	System.getProperty("user.dir") +
+        	System.getProperty("file.separator") +
+        	args[0]);
 
         CompilationUnit cu;
         try {
