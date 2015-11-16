@@ -7,11 +7,16 @@ public class Process extends Node {
 
 	private String description;
 
-	Process(String description) {
+	public Process(String description) {
 		this.description = description;
 	}
 
 	public String getDescription() {
 		return this.description;
+	}
+
+	@Override
+	public String toString() {
+		return getDescription();
 	}
 }

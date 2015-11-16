@@ -19,4 +19,7 @@ public abstract class Node {
 	public void setNextNode(Node nextNode) {
 		this.nextNode = nextNode;
 	}
+
+	@Override
+	abstract public String toString();
 }

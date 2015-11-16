@@ -13,7 +13,7 @@ public class Decision extends Node {
 	private Node trueBranch;
 	@Nullable private Node falseBranch;
 
-	Decision(String condition) {
+	public Decision(String condition) {
 		this.condition = condition;
 	}
 
@@ -35,5 +35,10 @@ public class Decision extends Node {
 
 	public void setFalseBranch(Node falseBranch) {
 		this.falseBranch = falseBranch;
+	}
+
+	@Override
+	public String toString() {
+		return getCondition();
 	}
 }
