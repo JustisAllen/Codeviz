@@ -1,17 +1,17 @@
 package com.github.codeviz.ir;
 
-import javax.annotation.Nullable;
+import java.util.Optional;
 
 /**
  * Represents conditional logic in which one of two branches are taken
  * based on some condition. The 'false' branch is not always required,
  * but the 'true' branch is.
  */
-public class Decision extends Node {
+public class Decision extends FlowchartNode {
 
 	private String condition;
-	private Node trueBranch;
-	@Nullable private Node falseBranch;
+	private FlowchartNode trueBranch;
+	private Optional<FlowchartNode> falseBranch = Optional.empty();
 
 	public Decision(String condition) {
 		this.condition = condition;
@@ -21,19 +21,19 @@ public class Decision extends Node {
 		return this.condition;
 	}
 
-	public Node getTrueBranch() {
+	public FlowchartNode getTrueBranch() {
 		return this.trueBranch;
 	}
 
-	@Nullable public Node getFalseBranch() {
+	public Optional<FlowchartNode> getFalseBranch() {
 		return this.falseBranch;
 	}
 
-	public void setTrueBranch(Node trueBranch) {
+	public void setTrueBranch(FlowchartNode trueBranch) {
 		this.trueBranch = trueBranch;
 	}
 
-	public void setFalseBranch(Node falseBranch) {
+	public void setFalseBranch(Optional<FlowchartNode> falseBranch) {
 		this.falseBranch = falseBranch;
 	}
 

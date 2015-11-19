@@ -3,7 +3,7 @@ package com.github.codeviz.ir;
 /**
  * Represents an action, or something to be performed.
  */
-public class Process extends Node {
+public class Process extends FlowchartNode {
 
 	private String description;
 
