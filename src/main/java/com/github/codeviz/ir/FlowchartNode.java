@@ -1,5 +1,8 @@
 package com.github.codeviz.ir;
 
+import org.anarres.graphviz.builder.GraphVizable;
+import org.anarres.graphviz.builder.GraphVizScope;
+
 import java.util.Optional;
 
 /**
@@ -9,7 +12,8 @@ import java.util.Optional;
  * in the flowchart. An empty nextNode may have different meanings
  * depending on the context.
  */
-public abstract class FlowchartNode {
+public abstract class FlowchartNode implements GraphVizable {
+	protected static final GraphVizScope scope = new Scope();
 	protected Optional<FlowchartNode> nextNode = Optional.empty();
 
 	public Optional<FlowchartNode> getNextNode() {
@@ -22,4 +26,6 @@ public abstract class FlowchartNode {
 
 	@Override
 	abstract public String toString();
+
+	private static class Scope implements GraphVizScope {}
 }

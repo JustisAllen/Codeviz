@@ -1,6 +1,10 @@
 package com.github.codeviz.ir;
 
+import org.anarres.graphviz.builder.GraphVizGraph;
+
 import java.util.Optional;
+
+import javax.annotation.Nonnull;
 
 /**
  * Represents conditional logic in which one of two branches are taken
@@ -8,7 +12,6 @@ import java.util.Optional;
  * but the 'true' branch is.
  */
 public class Decision extends FlowchartNode {
-
 	private String condition;
 	private FlowchartNode trueBranch;
 	private Optional<FlowchartNode> falseBranch = Optional.empty();
@@ -35,6 +38,11 @@ public class Decision extends FlowchartNode {
 
 	public void setFalseBranch(Optional<FlowchartNode> falseBranch) {
 		this.falseBranch = falseBranch;
+	}
+
+	@Override
+	public void toGraphViz(@Nonnull GraphVizGraph graph) {
+		// TODO: implement
 	}
 
 	@Override

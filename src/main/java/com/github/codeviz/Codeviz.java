@@ -2,6 +2,7 @@ package com.github.codeviz;
 
 import com.github.codeviz.ir.FlowchartNode;
 import com.github.codeviz.ir.Process;
+
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
@@ -9,6 +10,9 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.comments.Comment;
 
+import org.anarres.graphviz.builder.GraphVizUtils;
+
+import java.io.File;
 import java.io.FileInputStream;
 import java.util.Iterator;
 import java.util.Optional;
@@ -18,9 +22,9 @@ public class Codeviz {
 
         //$ Create an input stream for the file to be parsed
         FileInputStream in = new FileInputStream(
-        	System.getProperty("user.dir") +
-        	System.getProperty("file.separator") +
-        	args[0]);
+        	System.getProperty("user.dir")
+        	+ System.getProperty("file.separator")
+        	+ args[0]);
 
         //$ Parse the file into JavaParser's abstract syntax
         CompilationUnit cu;
@@ -42,21 +46,18 @@ public class Codeviz {
         }
 
         //$ Parse the method to the flowchart abstract syntax
-        Optional<FlowchartNode> flowchart = parse(mainMethod.get());
+        Optional<FlowchartNode> abstractFlowchart = parse(mainMethod.get());
 
         //? No top-level comments in method?
-        if (!flowchart.isPresent()) {
+        if (!abstractFlowchart.isPresent()) {
         	//X Exit with an error message
         	System.out.println("No top-level comments to parse in \""
         			+ methodToParse + "\" method.");
         	System.exit(1);
         }
 
-        //$ Print the resulting AST
-        for (Optional<FlowchartNode> currentNode = flowchart; currentNode.isPresent();
-        		currentNode = currentNode.get().getNextNode()) {
-        	System.out.println(currentNode.get());
-        }
+        //$ Write the Graphviz DOT file based on the flowchart AST
+        GraphVizUtils.toGraphVizFile(new File("out.dot"), abstractFlowchart.get());
     }
 
     /**
