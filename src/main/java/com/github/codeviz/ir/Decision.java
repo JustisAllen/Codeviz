@@ -12,41 +12,41 @@ import javax.annotation.Nonnull;
  * but the 'true' branch is.
  */
 public class Decision extends FlowchartNode {
-	private String condition;
-	private FlowchartNode trueBranch;
-	private Optional<FlowchartNode> falseBranch = Optional.empty();
+  private String condition;
+  private FlowchartNode trueBranch;
+  private Optional<FlowchartNode> falseBranch = Optional.empty();
 
-	public Decision(String condition) {
-		this.condition = condition;
-	}
+  public Decision(String condition) {
+    this.condition = condition;
+  }
 
-	public String getCondition() {
-		return this.condition;
-	}
+  public String getCondition() {
+    return this.condition;
+  }
 
-	public FlowchartNode getTrueBranch() {
-		return this.trueBranch;
-	}
+  public FlowchartNode getTrueBranch() {
+    return this.trueBranch;
+  }
 
-	public Optional<FlowchartNode> getFalseBranch() {
-		return this.falseBranch;
-	}
+  public Optional<FlowchartNode> getFalseBranch() {
+    return this.falseBranch;
+  }
 
-	public void setTrueBranch(FlowchartNode trueBranch) {
-		this.trueBranch = trueBranch;
-	}
+  public void setTrueBranch(FlowchartNode trueBranch) {
+    this.trueBranch = trueBranch;
+  }
 
-	public void setFalseBranch(Optional<FlowchartNode> falseBranch) {
-		this.falseBranch = falseBranch;
-	}
+  public void setFalseBranch(Optional<FlowchartNode> falseBranch) {
+    this.falseBranch = falseBranch;
+  }
 
-	@Override
-	public void toGraphViz(@Nonnull GraphVizGraph graph) {
-		// TODO: implement
-	}
+  @Override
+  public void toGraphViz(@Nonnull GraphVizGraph graph) {
+    // TODO: implement
+  }
 
-	@Override
-	public String toString() {
-		return getCondition();
-	}
+  @Override
+  public String toString() {
+    return getCondition();
+  }
 }

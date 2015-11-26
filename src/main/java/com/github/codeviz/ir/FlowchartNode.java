@@ -13,19 +13,19 @@ import java.util.Optional;
  * depending on the context.
  */
 public abstract class FlowchartNode implements GraphVizable {
-	protected static final GraphVizScope scope = new Scope();
-	protected Optional<FlowchartNode> nextNode = Optional.empty();
+  protected static final GraphVizScope scope = new Scope();
+  protected Optional<FlowchartNode> nextNode = Optional.empty();
 
-	public Optional<FlowchartNode> getNextNode() {
-		return this.nextNode;
-	}
+  public Optional<FlowchartNode> getNextNode() {
+    return this.nextNode;
+  }
 
-	public void setNextNode(Optional<FlowchartNode> nextNode) {
-		this.nextNode = nextNode;
-	}
+  public void setNextNode(Optional<FlowchartNode> nextNode) {
+    this.nextNode = nextNode;
+  }
 
-	@Override
-	abstract public String toString();
+  @Override
+  abstract public String toString();
 
-	private static class Scope implements GraphVizScope {}
+  private static class Scope implements GraphVizScope {}
 }
