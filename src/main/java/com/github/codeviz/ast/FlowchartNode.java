@@ -1,4 +1,4 @@
-package com.github.codeviz.ir;
+package com.github.codeviz.ast;
 
 import org.anarres.graphviz.builder.GraphVizable;
 import org.anarres.graphviz.builder.GraphVizScope;

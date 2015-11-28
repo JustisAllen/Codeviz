@@ -1,7 +1,7 @@
 package com.github.codeviz;
 
-import com.github.codeviz.ir.FlowchartNode;
-import com.github.codeviz.ir.Process;
+import com.github.codeviz.ast.FlowchartNode;
+import com.github.codeviz.ast.Process;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseException;
