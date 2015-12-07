@@ -12,9 +12,9 @@ import javax.annotation.Nonnull;
  * but the 'true' branch is.
  */
 public class Decision extends FlowchartNode {
-  private String condition;
-  private FlowchartNode trueBranch;
-  private Optional<FlowchartNode> falseBranch = Optional.empty();
+  protected String condition;
+  protected FlowchartNode trueBranch;
+  protected Optional<FlowchartNode> falseBranch = Optional.empty();
 
   public Decision(String condition) {
     this.condition = condition;
@@ -32,21 +32,24 @@ public class Decision extends FlowchartNode {
     return this.falseBranch;
   }
 
-  public void setTrueBranch(FlowchartNode trueBranch) {
+  public void setTrueBranch(@Nonnull FlowchartNode trueBranch) {
     this.trueBranch = trueBranch;
   }
 
-  public void setFalseBranch(Optional<FlowchartNode> falseBranch) {
-    this.falseBranch = falseBranch;
+  public void setFalseBranch(@Nonnull FlowchartNode falseBranch) {
+    this.falseBranch = Optional.of(falseBranch);
   }
 
   @Override
   public void toGraphViz(@Nonnull GraphVizGraph graph) {
-    // TODO: implement
-  }
-
-  @Override
-  public String toString() {
-    return getCondition();
+    graph.node(super.scope, this)
+      .label(getCondition())
+      .shape("diamond");
+    trueBranch.toGraphViz(graph);
+    graph.edge(super.scope, this, trueBranch);
+    if (falseBranch.isPresent()) {
+      falseBranch.get().toGraphViz(graph);
+      graph.edge(super.scope, this, falseBranch.get());
+    }
   }
 }

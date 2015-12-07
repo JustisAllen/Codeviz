@@ -5,12 +5,13 @@ import org.anarres.graphviz.builder.GraphVizGraph;
 import javax.annotation.Nonnull;
 
 /**
- * Represents an action, or something to be performed.
+ * Represents an action, or something to be performed;
+ * then exits the program.
  */
-public class Process extends SingleExitNode {
+public class Terminal extends FlowchartNode {
   protected String description; 
 
-  public Process(String description) {
+  public Terminal(String description) {
     this.description = description;
   }
 
@@ -22,11 +23,6 @@ public class Process extends SingleExitNode {
   public void toGraphViz(@Nonnull GraphVizGraph graph) {
     graph.node(super.scope, this)
       .label(getDescription())
-      .shape("box");
-    if (getNextNode().isPresent()) {
-      FlowchartNode nextNode = getNextNode().get();
-      nextNode.toGraphViz(graph);
-      graph.edge(super.scope, this, nextNode);
-    }
+      .shape("oval");
   }
 }
