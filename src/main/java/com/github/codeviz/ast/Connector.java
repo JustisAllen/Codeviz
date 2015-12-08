@@ -9,7 +9,7 @@ public class Connector extends SingleExitNode {
   @Override
   public void toGraphViz(@Nonnull GraphVizGraph graph) {
     graph.node(super.scope, this)
-      //.label(getDescription())
+      .label("")
       .shape("circle");
   }
 }

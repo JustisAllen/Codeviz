@@ -28,10 +28,7 @@ public class Codeviz {
 
     //$ Parse the file into JavaParser's abstract syntax
     CompilationUnit javaAst = null;
-    try (FileInputStream inputFile = new FileInputStream(
-        System.getProperty("user.dir")
-            + System.getProperty("file.separator")
-            + args[0])) {
+    try (FileInputStream inputFile = new FileInputStream(args[0])) {
       javaAst = JavaParser.parse(inputFile);
     } catch (IOException | com.github.javaparser.ParseException e) {
       System.out.println(e.getMessage());
@@ -245,8 +242,8 @@ public class Codeviz {
         return falseBranch;
       } else {
         Connector connector = new Connector();
-        ifFlowchartNode.setFalseBranch(connector);
         setNextNode(trueBranch, connector);
+        setNextNode(falseBranch.get(), connector);
         return Optional.of(connector);
       }
     }
