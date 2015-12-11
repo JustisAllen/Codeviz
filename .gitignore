@@ -1,4 +1,3 @@
 target/
-*.dot
-*.ps
+out*
 
