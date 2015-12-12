@@ -69,7 +69,7 @@ public class Codeviz {
   /**
    * @return The {@link MethodDeclaration} (wrapped in an {@link Optional}) in {@code javaAst}
    *    corresponding to the method with the specified {@code methodName}
-   *    --{@link Optional#empty()} if the method does not exist.
+   *    --{@link Optional#empty()} if a method with the name does not exist.
    */
   public static Optional<MethodDeclaration> getMethod(String methodName, CompilationUnit javaAst) {
     for (Node node : javaAst.getChildrenNodes()) {
@@ -104,21 +104,25 @@ public class Codeviz {
         findFlowchartNode(topLevelNodes, Optional.empty());
 
     //? No such comment?
-    if (!firstFlowchartNode.filter(node -> hasSingleExit(node)).isPresent()) {
+    if (!firstFlowchartNode.isPresent()) {
       //X Finish prematurely
       return Optional.empty();
     }
 
-    //% Save the flowchart node representing the found comment
-    //> to return at the end of the function,
-    //> then continue looking through the top-level constructs for appropriate comments
+    //% The flowchart node representing the found comment is saved
+    //> to return at the end of the function
 
     Optional<FlowchartNode> currentNode = firstFlowchartNode;
     Optional<FlowchartNode> nextNode;
 
-    //? Is there another appropriate top-level comment?
-    while ((nextNode = findFlowchartNode(topLevelNodes, currentNode))
-        .filter(node -> hasSingleExit(node)).isPresent()) {
+    //? Can we link another node to the current node,
+    //> and is there another appropriate top-level comment
+    //> that can be parsed to a node in the flowchart abstract syntax?
+    while (currentNode.filter(node -> hasSingleExit(node)).isPresent()
+        && (nextNode = findFlowchartNode(topLevelNodes, currentNode)).isPresent()) {
+      
+      //% The current node is linked to the next node
+      //$ Set this new node as the current node
       currentNode = nextNode;
     }
 
@@ -128,9 +132,13 @@ public class Codeviz {
 
   /**
    * Searches {@code nodes} for the first comment that can be parsed
-   * into a {@link FlowchartNode}. Note that {@code nodes} is mutated
-   * as a side effect of searching it.
+   * into a {@link FlowchartNode}.
    *
+   * @param nodes The iterator over the top-level nodes of a Java construct
+   *      (e.g., method, if statement). The iterator is mutated as a side effect
+   *      of searching it.
+   * @param currentNode The node to which the found node is intended to be linked.
+   *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
    * @return The first possible {@link FlowchartNode} (wrapped in an {@link Optional})
    *    of an appropriate {@link Comment} if one exists; {@link Optional#empty()} otherwise.
    */
@@ -301,6 +309,10 @@ public class Codeviz {
 
   private static FlowchartNode parseRestOfBranch(Iterator<Node> nodes, FlowchartNode firstNode)
       throws java.text.ParseException {
+
+    if (isTerminal(firstNode)) {
+      return firstNode;
+    }
 
     Optional<FlowchartNode> currentNode = Optional.of(firstNode);
     Optional<FlowchartNode> nextNode;
