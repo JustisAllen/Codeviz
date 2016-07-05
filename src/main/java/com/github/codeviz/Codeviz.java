@@ -115,13 +115,13 @@ public class Codeviz {
     Optional<FlowchartNode> currentNode = firstFlowchartNode;
     Optional<FlowchartNode> nextNode;
 
-    //? Can we link another node to the current node,
+    //? Can we flow from the current node to another node,
     //> and is there another appropriate top-level comment
     //> that can be parsed to a node in the flowchart abstract syntax?
     while (currentNode.filter(node -> hasSingleExit(node)).isPresent()
         && (nextNode = findFlowchartNode(topLevelNodes, currentNode)).isPresent()) {
       
-      //% The current node is linked to the next node
+      //% The current node flows to the next node
       //$ Set this new node as the current node
       currentNode = nextNode;
     }
@@ -132,14 +132,15 @@ public class Codeviz {
 
   /**
    * Searches {@code nodes} for the first comment that can be parsed
-   * into a {@link FlowchartNode}.
+   * into a {@link FlowchartNode}, and if found, causes the {@code currentNode}
+   * to flow to the new node.
    *
    * @param nodes The iterator over the top-level nodes of a Java construct
    *      (e.g., method, if statement). The iterator is mutated as a side effect
    *      of searching it.
-   * @param currentNode The node to which the found node is intended to be linked.
+   * @param currentNode The node to which the found node is intended to flow.
    *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
-   * @return The first possible {@link FlowchartNode} (wrapped in an {@link Optional})
+   * @return The first {@link FlowchartNode} (wrapped in an {@link Optional})
    *    of an appropriate {@link Comment} if one exists; {@link Optional#empty()} otherwise.
    */
   private static Optional<FlowchartNode> findFlowchartNode(
@@ -173,7 +174,7 @@ public class Codeviz {
   }
 
   /**
-   * @return The {@link Comment} (wrapped in an {@link Optional}) associated with {@code node}
+   * Returns the {@link Comment} (wrapped in an {@link Optional}) associated with {@code node}
    *    (potentially itself) if one exists; {@link Optional#empty()} otherwise.
    */
   private static Optional<Comment> getComment(Node node) {
@@ -187,8 +188,11 @@ public class Codeviz {
   }
 
   /**
-   * Attempts to parse {@code comment} to an appropriate {@link FlowchartNode}.
+   * Attempts to parse {@code comment} to an appropriate {@link FlowchartNode},
+   * and if successfully parsed, causes the {@code currentNode} to flow to the new node.
    *
+   * @param currentNode The node to which the found node is intended to flow.
+   *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
    * @return The {@link FlowchartNode} (wrapped in an {@link Optional})
    *    representing {@code comment} if {@code comment} can be parsed to one; 
    *    {@link Optional#empty()} otherwise.
@@ -218,43 +222,44 @@ public class Codeviz {
     return flowchartNode;
   }
 
-  private static void setNextNode(FlowchartNode currentNode, FlowchartNode nextNode) {
-    if (currentNode instanceof SingleExitNode) {
-      ((SingleExitNode) currentNode).setNextNode(nextNode);
-    } else {
-      ((Decision) currentNode).setFalseBranch(nextNode);
-    }
-  }
-
+  /**
+   * Attempts to parse {@code comment} to an appropriate {@link Decision},
+   * and if successfully parsed, causes the {@code currentNode} to flow to the new node.
+   */
   private static Optional<FlowchartNode> parseConditional(
       Comment comment, Optional<FlowchartNode> currentNode)
           throws java.text.ParseException {
 
     Node commentedNode = comment.getCommentedNode();
+
+    //? Is the conditional an if statement?
     if (commentedNode instanceof IfStmt) {
       Decision ifFlowchartNode = new Decision(comment.getContent().substring(1).trim());
       currentNode.ifPresent(node -> setNextNode(node, ifFlowchartNode));
       IfStmt ifStmt = (IfStmt) commentedNode;
-      FlowchartNode trueBranch = parseTrueBranch(ifStmt.getThenStmt(), ifFlowchartNode);
-      Optional<FlowchartNode> falseBranch =
+      FlowchartNode lastTrueBranchNode = parseTrueBranch(ifStmt.getThenStmt(), ifFlowchartNode);
+      Optional<FlowchartNode> lastFalseBranchNode =
           parseFalseBranch(Optional.ofNullable(ifStmt.getElseStmt()), ifFlowchartNode);
 
-      if ((!falseBranch.isPresent() || falseBranch.filter(node -> isTerminal(node)).isPresent())
-          && isTerminal(trueBranch)) {
+      if ((!lastFalseBranchNode.isPresent()
+              || lastFalseBranchNode.filter(node -> isTerminal(node)).isPresent())
+          && isTerminal(lastTrueBranchNode)) {
         return Optional.of(ifFlowchartNode);
-      } else if (falseBranch.filter(node -> isTerminal(node)).isPresent()
-          && hasSingleExit(trueBranch)) {
-        return Optional.of(trueBranch);
-      } else if (falseBranch.filter(node -> hasSingleExit(node)).isPresent()
-          && isTerminal(trueBranch)) {
-        return falseBranch;
+      } else if (lastFalseBranchNode.filter(node -> isTerminal(node)).isPresent()
+          && hasSingleExit(lastTrueBranchNode)) {
+        return Optional.of(lastTrueBranchNode);
+      } else if (lastFalseBranchNode.filter(node -> hasSingleExit(node)).isPresent()
+          && isTerminal(lastTrueBranchNode)) {
+        return lastFalseBranchNode;
       } else {
         Connector connector = new Connector();
-        setNextNode(trueBranch, connector);
-        setNextNode(falseBranch.get(), connector);
+        setNextNode(lastTrueBranchNode, connector);
+        setNextNode(lastFalseBranchNode.get(), connector);
         return Optional.of(connector);
       }
     }
+
+    //X Indicate failure to parse the conditional to nodes in the flowchart abstract syntax
     return Optional.empty();
   }
 
@@ -287,7 +292,7 @@ public class Codeviz {
     }
     Statement stmt = maybeStmt.get();
 
-    //$ Get the top-level constructs of the true branch
+    //$ Get the top-level constructs of the false branch
     Iterator<Node> topLevelNodes = stmt instanceof BlockStmt
         ? ((BlockStmt) stmt).getChildrenNodes().iterator()
         : Iterators.singletonIterator(stmt);
@@ -325,6 +330,17 @@ public class Codeviz {
 
     //X Return the last flowchart node
     return currentNode.get();
+  }
+
+  /**
+   * @param currentNode Must satisfy {@link #hasSingleExit(FlowchartNode)}.
+   */
+  private static void setNextNode(FlowchartNode currentNode, FlowchartNode nextNode) {
+    if (currentNode instanceof SingleExitNode) {
+      ((SingleExitNode) currentNode).setNextNode(nextNode);
+    } else {
+      ((Decision) currentNode).setFalseBranch(nextNode);
+    }
   }
 
   private static boolean isTerminal(FlowchartNode node) {
