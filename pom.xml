@@ -16,14 +16,9 @@
 
   <dependencies>
     <dependency>
-	    <groupId>com.github.javaparser</groupId>
-	    <artifactId>javaparser-core</artifactId>
-	    <version>2.2.2</version>
-    </dependency>
-    <dependency>
-      <groupId>com.google.code.findbugs</groupId>
-      <artifactId>jsr305</artifactId>
-      <version>3.0.0</version>
+      <groupId>com.github.javaparser</groupId>
+      <artifactId>javaparser-core</artifactId>
+      <version>2.2.2</version>
     </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -34,6 +29,12 @@
       <groupId>org.anarres.graphviz</groupId>
       <artifactId>graphviz-builder</artifactId>
       <version>1.0.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.jena</groupId>
+      <artifactId>apache-jena-libs</artifactId>
+      <type>pom</type>
+      <version>3.1.0</version>
     </dependency>
   </dependencies>
 
@@ -51,7 +52,7 @@
           </execution>
         </executions>
         <configuration>
-          <mainClass>com.github.codeviz.Codeviz</mainClass>
+          <mainClass>com.github.codeviz.JavaParser</mainClass>
         </configuration>
       </plugin>
       <plugin>
