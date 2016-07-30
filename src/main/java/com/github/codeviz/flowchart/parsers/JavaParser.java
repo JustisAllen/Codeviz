@@ -1,9 +1,10 @@
-package com.github.codeviz;
+package com.github.codeviz.flowchart.parsers;
 
-import com.github.codeviz.ast.*;
-import com.github.codeviz.ast.Process; // Explicit import due to conflict with java.lang.Process
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
-import com.github.javaparser.JavaParser;
+import com.github.codeviz.flowchart.common.Constants;
+import com.github.codeviz.flowchart.common.Utilities;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -12,24 +13,36 @@ import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.Statement;
-
 import com.google.common.collect.Iterators;
-
-import org.anarres.graphviz.builder.GraphVizUtils;
-
-import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.Optional;
+import org.apache.jena.ontology.Individual;
+import org.apache.jena.ontology.OntClass;
+import org.apache.jena.ontology.OntModel;
+import org.apache.jena.ontology.OntProperty;
+import org.apache.jena.riot.RDFDataMgr;
+import org.apache.jena.riot.RDFFormat;
 
-public class Codeviz {
-  public static void main(String[] args) throws IOException {
+/**
+ * Parses a Java file into the Codeviz OWL representation of a flowchart.
+ *
+ * TODO: Optimize. Consider using a data structure to reduce/remove recursion.
+ * Also consider creating a(n ideally language independent (via OWL?)) 'Parser' interface,
+ * and removing the actual parsing logic from this class.
+ */
+public class JavaParser {
 
-    //$ Parse the file into JavaParser's abstract syntax
+  private static final OntModel flowchartModel = Utilities.createFlowchartModel();
+
+  public static void main(String[] args) throws IOException, java.text.ParseException {    
+
+    //$ Parse the input Java file into a (GitHub) JavaParser AST
     CompilationUnit javaAst = null;
-    try (FileInputStream inputFile = new FileInputStream(args[0])) {
-      javaAst = JavaParser.parse(inputFile);
+    try (FileInputStream inputFile = new FileInputStream(args[0] /* input file path */)) {
+      javaAst = com.github.javaparser.JavaParser.parse(inputFile);
     } catch (IOException | com.github.javaparser.ParseException e) {
       System.out.println(e.getMessage());
       System.exit(1);
@@ -47,7 +60,7 @@ public class Codeviz {
     }
 
     //$ Parse the method to the flowchart abstract syntax
-    Optional<FlowchartNode> abstractFlowchart = null;
+    Optional<Individual> abstractFlowchart = Optional.empty();
     try {
       abstractFlowchart = parse(mainMethod.get());
     } catch (java.text.ParseException e) {
@@ -62,12 +75,13 @@ public class Codeviz {
       System.exit(1);
     }
 
-    //$ Write the Graphviz DOT file based on the flowchart AST
-    GraphVizUtils.toGraphVizFile(new File("out.dot"), abstractFlowchart.get());
+    //$ Write the OWL file based on the flowchart AST
+    RDFDataMgr.write(
+        new FileOutputStream("out.owl"), flowchartModel.getBaseModel(), RDFFormat.TURTLE_BLOCKS);
   }
 
   /**
-   * @return The {@link MethodDeclaration} (wrapped in an {@link Optional}) in {@code javaAst}
+   * Returns the {@link MethodDeclaration} (wrapped in an {@link Optional}) in {@code javaAst}
    *    corresponding to the method with the specified {@code methodName}
    *    --{@link Optional#empty()} if a method with the name does not exist.
    */
@@ -90,18 +104,18 @@ public class Codeviz {
   /**
    * Attempts to parse the given {@link MethodDeclaration} into the flowchart abstract syntax.
    *
-   * @return The first {@link FlowchartNode} (wrapped in an {@link Optional})
-   *    of the resulting AST if it exists; {@link Optional#empty()} otherwise.
+   * @return The {@link Individual} (wrapped in an {@link Optional})
+   *    representing the first flowchart node of the resulting AST if it exists;
+   *    {@link Optional#empty()} otherwise.
    */
-  public static Optional<FlowchartNode> parse(MethodDeclaration method)
+  private static Optional<Individual> parse(MethodDeclaration method)
       throws java.text.ParseException {
 
     //$ Get the top-level constructs of the method
     Iterator<Node> topLevelNodes = method.getBody().getChildrenNodes().iterator();
 
     //$ Find the first top-level comment that parses to a node in the flowchart abstract syntax
-    Optional<FlowchartNode> firstFlowchartNode =
-        findFlowchartNode(topLevelNodes, Optional.empty());
+    Optional<Individual> firstFlowchartNode = findFlowchartNode(topLevelNodes, Optional.empty());
 
     //? No such comment?
     if (!firstFlowchartNode.isPresent()) {
@@ -112,8 +126,8 @@ public class Codeviz {
     //% The flowchart node representing the found comment is saved
     //> to return at the end of the function
 
-    Optional<FlowchartNode> currentNode = firstFlowchartNode;
-    Optional<FlowchartNode> nextNode;
+    Optional<Individual> currentNode = firstFlowchartNode;
+    Optional<Individual> nextNode;
 
     //? Can we flow from the current node to another node,
     //> and is there another appropriate top-level comment
@@ -132,20 +146,19 @@ public class Codeviz {
 
   /**
    * Searches {@code nodes} for the first comment that can be parsed
-   * into a {@link FlowchartNode}, and if found, causes the {@code currentNode}
-   * to flow to the new node.
+   * into an {@link Individual} of the flowchart abstract syntax,
+   * and if found, causes the {@code currentNode} to flow to the new node.
    *
    * @param nodes The iterator over the top-level nodes of a Java construct
    *      (e.g., method, if statement). The iterator is mutated as a side effect
    *      of searching it.
    * @param currentNode The node to which the found node is intended to flow.
    *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
-   * @return The first {@link FlowchartNode} (wrapped in an {@link Optional})
+   * @return The first {@link Individual} (wrapped in an {@link Optional})
    *    of an appropriate {@link Comment} if one exists; {@link Optional#empty()} otherwise.
    */
-  private static Optional<FlowchartNode> findFlowchartNode(
-      Iterator<Node> nodes, Optional<FlowchartNode> currentNode)
-          throws java.text.ParseException {
+  private static Optional<Individual> findFlowchartNode(
+      Iterator<Node> nodes, Optional<Individual> currentNode) throws java.text.ParseException {
 
     //? Is there another node to consider?
     while (nodes.hasNext()) {
@@ -159,7 +172,7 @@ public class Codeviz {
       }
 
       //$ Attempt to parse the comment to a node in the flowchart abstract syntax
-      Optional<FlowchartNode> flowchartNode = parseComment(comment.get(), currentNode);
+      Optional<Individual> flowchartNode = parseComment(comment.get(), currentNode);
 
       //? Success?
       if (flowchartNode.isPresent()) {
@@ -188,31 +201,35 @@ public class Codeviz {
   }
 
   /**
-   * Attempts to parse {@code comment} to an appropriate {@link FlowchartNode},
-   * and if successfully parsed, causes the {@code currentNode} to flow to the new node.
+   * Attempts to parse {@code comment} to an appropriate {@link Individual}
+   * of the flowchart abstract syntax, and if successfully parsed,
+   * causes the {@code currentNode} to flow to the new node.
    *
    * @param currentNode The node to which the found node is intended to flow.
    *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
-   * @return The {@link FlowchartNode} (wrapped in an {@link Optional})
+   * @return The {@link Individual} (wrapped in an {@link Optional})
    *    representing {@code comment} if {@code comment} can be parsed to one; 
    *    {@link Optional#empty()} otherwise.
    */
-  private static Optional<FlowchartNode> parseComment(
-      Comment comment, Optional<FlowchartNode> currentNode)
-          throws java.text.ParseException {
+  private static Optional<Individual> parseComment(
+      Comment comment, Optional<Individual> currentNode) throws java.text.ParseException {
 
-    Optional<FlowchartNode> flowchartNode;
+    Optional<Individual> flowchartNode;
     String commentStr = comment.getContent();
     switch (commentStr.charAt(0)) {
       case '$':
-        flowchartNode = Optional.of(new Process(commentStr.substring(1).trim()));
+        Individual processNode = createFlowchartNode(Constants.PROCESS_LN);
+        setProperty(processNode, Constants.HAS_DESCRIPTION_LN, commentStr.substring(1).trim());
+        flowchartNode = Optional.of(processNode);
         currentNode.ifPresent(node -> setNextNode(node, flowchartNode.get()));
         break;
       case '?':
         flowchartNode = parseConditional(comment, currentNode);
         break;
       case 'X':
-        flowchartNode = Optional.of(new Terminal(commentStr.substring(1).trim()));
+        Individual terminalNode = createFlowchartNode(Constants.TERMINAL_LN);
+        setProperty(terminalNode, Constants.HAS_DESCRIPTION_LN, commentStr.substring(1).trim());
+        flowchartNode = Optional.of(terminalNode);
         currentNode.ifPresent(node -> setNextNode(node, flowchartNode.get()));
         break;
       default:
@@ -223,22 +240,23 @@ public class Codeviz {
   }
 
   /**
-   * Attempts to parse {@code comment} to an appropriate {@link Decision},
+   * Attempts to parse {@code comment} to an appropriate {@code Decision},
    * and if successfully parsed, causes the {@code currentNode} to flow to the new node.
    */
-  private static Optional<FlowchartNode> parseConditional(
-      Comment comment, Optional<FlowchartNode> currentNode)
-          throws java.text.ParseException {
+  private static Optional<Individual> parseConditional(
+      Comment comment, Optional<Individual> currentNode) throws java.text.ParseException {
 
     Node commentedNode = comment.getCommentedNode();
 
     //? Is the conditional an if statement?
     if (commentedNode instanceof IfStmt) {
-      Decision ifFlowchartNode = new Decision(comment.getContent().substring(1).trim());
+      Individual ifFlowchartNode = createFlowchartNode(Constants.DECISION_LN);
+      setProperty(
+        ifFlowchartNode, Constants.HAS_CONDITION_LN, comment.getContent().substring(1).trim());
       currentNode.ifPresent(node -> setNextNode(node, ifFlowchartNode));
       IfStmt ifStmt = (IfStmt) commentedNode;
-      FlowchartNode lastTrueBranchNode = parseTrueBranch(ifStmt.getThenStmt(), ifFlowchartNode);
-      Optional<FlowchartNode> lastFalseBranchNode =
+      Individual lastTrueBranchNode = parseTrueBranch(ifStmt.getThenStmt(), ifFlowchartNode);
+      Optional<Individual> lastFalseBranchNode =
           parseFalseBranch(Optional.ofNullable(ifStmt.getElseStmt()), ifFlowchartNode);
 
       if ((!lastFalseBranchNode.isPresent()
@@ -252,10 +270,10 @@ public class Codeviz {
           && isTerminal(lastTrueBranchNode)) {
         return lastFalseBranchNode;
       } else {
-        Connector connector = new Connector();
-        setNextNode(lastTrueBranchNode, connector);
-        setNextNode(lastFalseBranchNode.get(), connector);
-        return Optional.of(connector);
+        Individual connectorNode = createFlowchartNode(Constants.CONNECTOR_LN);
+        setNextNode(lastTrueBranchNode, connectorNode);
+        setNextNode(lastFalseBranchNode.get(), connectorNode);
+        return Optional.of(connectorNode);
       }
     }
 
@@ -263,8 +281,13 @@ public class Codeviz {
     return Optional.empty();
   }
 
-  private static FlowchartNode parseTrueBranch(Statement stmt, Decision conditional)
+  private static Individual parseTrueBranch(Statement stmt, Individual decisionNode)
       throws java.text.ParseException {
+
+    checkArgument(
+        hasClass(decisionNode, Constants.DECISION_LN),
+        "Argument is of class %s, but expected Decision",
+        decisionNode.getOntClass(true).getLocalName());
 
     //$ Get the top-level constructs of the true branch
     Iterator<Node> topLevelNodes = stmt instanceof BlockStmt
@@ -272,10 +295,12 @@ public class Codeviz {
         : Iterators.singletonIterator(stmt);
 
     //$ Find the first top-level comment that parses to a node in the flowchart abstract syntax
-    Optional<FlowchartNode> firstFlowchartNode =
+    Optional<Individual> firstFlowchartNode =
         findFlowchartNode(topLevelNodes, Optional.empty());
 
-    conditional.setTrueBranch(
+    setProperty(
+        decisionNode,
+        Constants.HAS_TRUE_BRANCH_LN,
         firstFlowchartNode.orElseThrow(
             () -> new java.text.ParseException(
                 "No comments within indicated if statement.", stmt.getBeginLine())));
@@ -283,9 +308,13 @@ public class Codeviz {
     return parseRestOfBranch(topLevelNodes, firstFlowchartNode.get());
   }
 
-  private static Optional<FlowchartNode> parseFalseBranch(
-      Optional<Statement> maybeStmt, Decision conditional)
-          throws java.text.ParseException {
+  private static Optional<Individual> parseFalseBranch(
+      Optional<Statement> maybeStmt, Individual decisionNode) throws java.text.ParseException {
+
+    checkArgument(
+        hasClass(decisionNode, Constants.DECISION_LN),
+        "Argument is of class %s, but expected Decision",
+        decisionNode.getOntClass(true).getLocalName());
 
     if (!maybeStmt.isPresent()) {
       return Optional.empty();
@@ -298,8 +327,7 @@ public class Codeviz {
         : Iterators.singletonIterator(stmt);
 
     //$ Find the first top-level comment that parses to a node in the flowchart abstract syntax
-    Optional<FlowchartNode> firstFlowchartNode =
-        findFlowchartNode(topLevelNodes, Optional.empty());
+    Optional<Individual> firstFlowchartNode = findFlowchartNode(topLevelNodes, Optional.empty());
 
     //? No such comment?
     if (!firstFlowchartNode.isPresent()) {
@@ -307,20 +335,19 @@ public class Codeviz {
       return Optional.empty();
     }
 
-    conditional.setFalseBranch(firstFlowchartNode.get());
-
+    setProperty(decisionNode, Constants.HAS_FALSE_BRANCH_LN, firstFlowchartNode.get());
     return Optional.of(parseRestOfBranch(topLevelNodes, firstFlowchartNode.get()));
   }
 
-  private static FlowchartNode parseRestOfBranch(Iterator<Node> nodes, FlowchartNode firstNode)
+  private static Individual parseRestOfBranch(Iterator<Node> nodes, Individual firstNode)
       throws java.text.ParseException {
 
     if (isTerminal(firstNode)) {
       return firstNode;
     }
 
-    Optional<FlowchartNode> currentNode = Optional.of(firstNode);
-    Optional<FlowchartNode> nextNode;
+    Optional<Individual> currentNode = Optional.of(firstNode);
+    Optional<Individual> nextNode;
 
     //? Is there another appropriate top-level comment?
     while ((nextNode = findFlowchartNode(nodes, currentNode))
@@ -332,24 +359,52 @@ public class Codeviz {
     return currentNode.get();
   }
 
-  /**
-   * @param currentNode Must satisfy {@link #hasSingleExit(FlowchartNode)}.
-   */
-  private static void setNextNode(FlowchartNode currentNode, FlowchartNode nextNode) {
-    if (currentNode instanceof SingleExitNode) {
-      ((SingleExitNode) currentNode).setNextNode(nextNode);
-    } else {
-      ((Decision) currentNode).setFalseBranch(nextNode);
-    }
+  /** @param currentNode Must satisfy {@link #hasSingleExit(Individual)}. */
+  private static void setNextNode(Individual currentNode, Individual nextNode) {
+    setProperty(
+        currentNode,
+        hasClass(currentNode, Constants.SINGLE_EXIT_NODE_LN)
+            ? Constants.HAS_NEXT_NODE_LN
+            : Constants.HAS_FALSE_BRANCH_LN,
+        nextNode);
   }
 
-  private static boolean isTerminal(FlowchartNode node) {
-    return (node instanceof Terminal)
-        || ((node instanceof Decision) && ((Decision) node).getFalseBranch().isPresent());
+  private static boolean isTerminal(Individual flowchartNode) {
+    return hasClass(flowchartNode, Constants.TERMINAL_LN)
+        || (hasClass(flowchartNode, Constants.DECISION_LN)
+            && Utilities.hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
   }
 
-  private static boolean hasSingleExit(FlowchartNode node) {
-    return (node instanceof SingleExitNode)
-        || ((node instanceof Decision) && !(((Decision) node).getFalseBranch().isPresent()));
+  private static boolean hasSingleExit(Individual flowchartNode) {
+    return hasClass(flowchartNode, Constants.SINGLE_EXIT_NODE_LN)
+        || (hasClass(flowchartNode, Constants.DECISION_LN)
+            && !Utilities.hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
+  }
+
+  private static Individual createFlowchartNode(String classLocalName) {
+    OntClass flowchartNodeClass =
+        checkNotNull(
+            flowchartModel.getOntClass(Constants.FLOWCHART_ONTOLOGY_NAMESPACE + classLocalName),
+            "The flowchart node class %s does not exist in the ontology.",
+            classLocalName);
+    return  flowchartNodeClass.createIndividual();
+  }
+
+  private static void setProperty(
+      Individual flowchartNode, String propertyLocalName, String value) {
+
+    flowchartNode.setPropertyValue(
+        Utilities.getProperty(propertyLocalName), flowchartModel.createLiteral(value, false));
+  }
+
+  private static void setProperty(
+      Individual thisNode, String propertyLocalName, Individual thatNode) {
+
+    thisNode.setPropertyValue(Utilities.getProperty(propertyLocalName), thatNode);
+  }
+
+  /** Decides whether {@code flowchartNode} is a member of the given class. */
+  private static boolean hasClass(Individual flowchartNode, String classLocalName) {
+    return flowchartNode.hasOntClass(Constants.FLOWCHART_ONTOLOGY_NAMESPACE + classLocalName);
   }
 }
