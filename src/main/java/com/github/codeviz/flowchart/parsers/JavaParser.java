@@ -1,5 +1,8 @@
 package com.github.codeviz.flowchart.parsers;
 
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import com.github.codeviz.flowchart.common.Constants;
 import com.github.codeviz.flowchart.common.Utilities;
 import com.github.javaparser.ast.CompilationUnit;
@@ -10,28 +13,33 @@ import com.github.javaparser.ast.comments.Comment;
 import com.github.javaparser.ast.stmt.BlockStmt;
 import com.github.javaparser.ast.stmt.IfStmt;
 import com.github.javaparser.ast.stmt.Statement;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterators;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Iterator;
+import java.util.Optional;
 import org.apache.jena.ontology.Individual;
 import org.apache.jena.ontology.OntClass;
 import org.apache.jena.ontology.OntModel;
 import org.apache.jena.ontology.OntProperty;
 import org.apache.jena.riot.RDFDataMgr;
 import org.apache.jena.riot.RDFFormat;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.Optional;
 
-/** Parses a Java file into the Codeviz OWL representation of a flowchart. */
-public final class JavaParser {
+/**
+ * Parses a Java file into the Codeviz OWL representation of a flowchart.
+ *
+ * TODO: Optimize. Consider using a data structure to reduce/remove recursion.
+ * Also consider creating a(n ideally language independent (via OWL?)) 'Parser' interface,
+ * and removing the actual parsing logic from this class.
+ */
+public class JavaParser {
 
   private static final OntModel flowchartModel = Utilities.createFlowchartModel();
 
-  public static void main(String[] args) throws IOException {    
+  public static void main(String[] args) throws IOException, java.text.ParseException {    
 
-    //$ Parse the input Java file into a {@link com.github.javaparser.JavaParser} AST
+    //$ Parse the input Java file into a (GitHub) JavaParser AST
     CompilationUnit javaAst = null;
     try (FileInputStream inputFile = new FileInputStream(args[0] /* input file path */)) {
       javaAst = com.github.javaparser.JavaParser.parse(inputFile);
@@ -73,7 +81,7 @@ public final class JavaParser {
   }
 
   /**
-   * @return The {@link MethodDeclaration} (wrapped in an {@link Optional}) in {@code javaAst}
+   * Returns the {@link MethodDeclaration} (wrapped in an {@link Optional}) in {@code javaAst}
    *    corresponding to the method with the specified {@code methodName}
    *    --{@link Optional#empty()} if a method with the name does not exist.
    */
@@ -148,8 +156,6 @@ public final class JavaParser {
    *      If present, this node must satisfy {@link #hasSingleExit(FlowchartNode)}.
    * @return The first {@link Individual} (wrapped in an {@link Optional})
    *    of an appropriate {@link Comment} if one exists; {@link Optional#empty()} otherwise.
-   *
-   * TODO: Optimize. Consider using a data structure to reduce/remove recursion.
    */
   private static Optional<Individual> findFlowchartNode(
       Iterator<Node> nodes, Optional<Individual> currentNode) throws java.text.ParseException {
@@ -278,7 +284,7 @@ public final class JavaParser {
   private static Individual parseTrueBranch(Statement stmt, Individual decisionNode)
       throws java.text.ParseException {
 
-    Preconditions.checkArgument(
+    checkArgument(
         hasClass(decisionNode, Constants.DECISION_LN),
         "Argument is of class %s, but expected Decision",
         decisionNode.getOntClass(true).getLocalName());
@@ -305,7 +311,7 @@ public final class JavaParser {
   private static Optional<Individual> parseFalseBranch(
       Optional<Statement> maybeStmt, Individual decisionNode) throws java.text.ParseException {
 
-    Preconditions.checkArgument(
+    checkArgument(
         hasClass(decisionNode, Constants.DECISION_LN),
         "Argument is of class %s, but expected Decision",
         decisionNode.getOntClass(true).getLocalName());
@@ -353,9 +359,7 @@ public final class JavaParser {
     return currentNode.get();
   }
 
-  /**
-   * @param currentNode Must satisfy {@link #hasSingleExit(Individual)}.
-   */
+  /** @param currentNode Must satisfy {@link #hasSingleExit(Individual)}. */
   private static void setNextNode(Individual currentNode, Individual nextNode) {
     setProperty(
         currentNode,
@@ -368,46 +372,39 @@ public final class JavaParser {
   private static boolean isTerminal(Individual flowchartNode) {
     return hasClass(flowchartNode, Constants.TERMINAL_LN)
         || (hasClass(flowchartNode, Constants.DECISION_LN)
-            && hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
+            && Utilities.hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
   }
 
   private static boolean hasSingleExit(Individual flowchartNode) {
     return hasClass(flowchartNode, Constants.SINGLE_EXIT_NODE_LN)
         || (hasClass(flowchartNode, Constants.DECISION_LN)
-            && !hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
+            && !Utilities.hasProperty(flowchartNode, Constants.HAS_FALSE_BRANCH_LN));
   }
 
   private static Individual createFlowchartNode(String classLocalName) {
-    return Constants.FLOWCHART_CLASS_REFERENCES.get(classLocalName).createIndividual();
+    OntClass flowchartNodeClass =
+        checkNotNull(
+            flowchartModel.getOntClass(Constants.FLOWCHART_ONTOLOGY_NAMESPACE + classLocalName),
+            "The flowchart node class %s does not exist in the ontology.",
+            classLocalName);
+    return  flowchartNodeClass.createIndividual();
   }
 
   private static void setProperty(
       Individual flowchartNode, String propertyLocalName, String value) {
 
     flowchartNode.setPropertyValue(
-        Constants.FLOWCHART_PROPERTY_REFERENCES.get(propertyLocalName),
-        flowchartModel.createLiteral(value, Constants.LITERAL_LANG_TAG));
+        Utilities.getProperty(propertyLocalName), flowchartModel.createLiteral(value, false));
   }
 
   private static void setProperty(
       Individual thisNode, String propertyLocalName, Individual thatNode) {
 
-    thisNode.setPropertyValue(
-        Constants.FLOWCHART_PROPERTY_REFERENCES.get(propertyLocalName), thatNode);
+    thisNode.setPropertyValue(Utilities.getProperty(propertyLocalName), thatNode);
   }
 
-  /**
-   * Decides whether {@code flowchartNode} is a member of the given class.
-   */
+  /** Decides whether {@code flowchartNode} is a member of the given class. */
   private static boolean hasClass(Individual flowchartNode, String classLocalName) {
-    return flowchartNode.hasOntClass(Constants.FLOWCHART_CLASS_REFERENCES.get(classLocalName));
-  }
-
-  /**
-   * Decides whether {@code flowchartNode} has the given property set.
-   */
-  private static boolean hasProperty(Individual flowchartNode, String propertyLocalName) {
-    return flowchartNode.hasProperty(
-        Constants.FLOWCHART_PROPERTY_REFERENCES.get(propertyLocalName));
+    return flowchartNode.hasOntClass(Constants.FLOWCHART_ONTOLOGY_NAMESPACE + classLocalName);
   }
 }
